@@ -1,0 +1,273 @@
+{
+  "lanes": [
+    "Student UI",
+    "TypeScript host",
+    "CLI runtime",
+    "OTLP receiver",
+    "Web viewer"
+  ],
+  "arrows": [
+    [
+      0,
+      1,
+      "1. Validate the selected experiment"
+    ],
+    [
+      1,
+      3,
+      "2. Start the local OTLP receiver"
+    ],
+    [
+      1,
+      2,
+      "3. Enable the selected signals"
+    ],
+    [
+      1,
+      2,
+      "4. Configure OTLP and short intervals"
+    ],
+    [
+      1,
+      2,
+      "5. Preserve the private process environment"
+    ],
+    [
+      1,
+      2,
+      "6. Create an active application span"
+    ],
+    [
+      1,
+      2,
+      "7. Run query and consume native messages"
+    ],
+    [
+      2,
+      3,
+      "8. Receive and decode native OTLP"
+    ],
+    [
+      3,
+      4,
+      "9. Retain span IDs and resource tags"
+    ],
+    [
+      1,
+      3,
+      "10. Export the finished host span"
+    ],
+    [
+      1,
+      2,
+      "11. Attach encoded classroom attributes"
+    ],
+    [
+      1,
+      2,
+      "12. Make content logging explicit"
+    ],
+    [
+      3,
+      4,
+      "13. Compare delivery with agent completion"
+    ]
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "title": "Validate the selected experiment",
+      "source": "src/protocol.ts",
+      "code": "if (\n    !input ||\n    Object.keys(input).some((k) => k !== \"mode\") ||\n    !MODES.includes(input.mode)\n  )\n    throw new Error(\"Choose a listed telemetry experiment.\");\n  return { mode: input.mode };",
+      "language": "typescript",
+      "explanation": "Accept a fixed experiment only. Browser input cannot choose an arbitrary telemetry destination or add tools.",
+      "firstLine": 16,
+      "lastLine": 22,
+      "anchors": [
+        "if ("
+      ],
+      "sourceSHA256": "54a4774dba6769520ad217b1178dacd825c746cbcea24099ee4c271a317a6c15",
+      "narration": "Step 1. Accept a fixed experiment only. Browser input cannot choose an arbitrary telemetry destination or add tools. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 2,
+      "title": "Start the local OTLP receiver",
+      "source": "src/collector.ts",
+      "code": "server.listen(0, \"127.0.0.1\");\n  await once(server, \"listening\");\n  const address = server.address();\n  if (!address || typeof address === \"string\")\n    throw new Error(\"Collector could not start.\");",
+      "language": "typescript",
+      "explanation": "Bind a private loopback port chosen by the OS. The classroom receiver keeps bounded per-run data in memory; it is not a production Collector distribution.",
+      "firstLine": 147,
+      "lastLine": 151,
+      "anchors": [
+        "server.listen(0, \"127.0.0.1\");"
+      ],
+      "sourceSHA256": "64625814a72f521e6a5468e484134cc6714eaf61a1150aeefb365daef5b25fec",
+      "narration": "Step 2. Bind a private loopback port chosen by the OS. The classroom receiver keeps bounded per-run data in memory; it is not a production Collector distribution. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 3,
+      "title": "Enable the selected signals",
+      "source": "src/settings.ts",
+      "code": "CLAUDE_CODE_ENABLE_TELEMETRY: enabled ? \"1\" : \"0\",\n    CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: selected(\"traces\") ? \"1\" : \"0\",\n    OTEL_TRACES_EXPORTER: selected(\"traces\") ? \"otlp\" : \"none\",\n    OTEL_METRICS_EXPORTER: selected(\"metrics\") ? \"otlp\" : \"none\",\n    OTEL_LOGS_EXPORTER: selected(\"logs\") ? \"otlp\" : \"none\",",
+      "language": "typescript",
+      "explanation": "Select OTLP exporters for each signal and enable beta tracing where needed. Off explicitly disables telemetry.",
+      "firstLine": 17,
+      "lastLine": 21,
+      "anchors": [
+        "CLAUDE_CODE_ENABLE_TELEMETRY: enabled ? \"1\" : \"0\","
+      ],
+      "sourceSHA256": "4cefab08929329215e6ffa00ae94a1995f923a93468f2f3785f90268d224db92",
+      "narration": "Step 3. Select OTLP exporters for each signal and enable beta tracing where needed. Off explicitly disables telemetry. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 4,
+      "title": "Configure OTLP and short intervals",
+      "source": "src/settings.ts",
+      "code": "OTEL_EXPORTER_OTLP_PROTOCOL: \"http/json\",\n    OTEL_EXPORTER_OTLP_ENDPOINT: endpoint,\n    OTEL_EXPORTER_OTLP_HEADERS: `Authorization=Bearer ${token}`,\n    OTEL_METRIC_EXPORT_INTERVAL: \"1000\",\n    OTEL_LOGS_EXPORT_INTERVAL: \"1000\",\n    OTEL_TRACES_EXPORT_INTERVAL: \"1000\",",
+      "language": "typescript",
+      "explanation": "Use standard OTLP HTTP/JSON for inspectable native exports. The lesson slide uses HTTP/protobuf, another supported encoding. One-second intervals reduce short-run batching windows.",
+      "firstLine": 22,
+      "lastLine": 27,
+      "anchors": [
+        "OTEL_EXPORTER_OTLP_PROTOCOL: \"http/json\","
+      ],
+      "sourceSHA256": "4cefab08929329215e6ffa00ae94a1995f923a93468f2f3785f90268d224db92",
+      "narration": "Step 4. Use standard OTLP HTTP/JSON for inspectable native exports. The lesson slide uses HTTP/protobuf, another supported encoding. One-second intervals reduce short-run batching windows. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 5,
+      "title": "Preserve the private process environment",
+      "source": "src/agent.ts",
+      "code": "env: {\n        ...inheritedEnvironment(),\n        ...otel,\n        HOME: workspace.home,",
+      "language": "typescript",
+      "explanation": "Preserve PATH and private credentials while replacing inherited exporter routing with this per-run local configuration. Isolate SDK state in the disposable workspace.",
+      "firstLine": 64,
+      "lastLine": 67,
+      "anchors": [
+        "env: {"
+      ],
+      "sourceSHA256": "5f18411b89c4ae36aabc1b650cc8466a9957c0163a6aeb837b795e3d44ba6d52",
+      "narration": "Step 5. Preserve PATH and private credentials while replacing inherited exporter routing with this per-run local configuration. Isolate SDK state in the disposable workspace. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 6,
+      "title": "Create an active application span",
+      "source": "src/tracing.ts",
+      "code": "return trace\n    .getTracer(\"lesson47\")\n    .startActiveSpan(\"classroom.http.request\", async (span) => {\n      const ids = span.spanContext();\n      try {\n        await action();\n      } finally {",
+      "language": "typescript",
+      "explanation": "Linked mode enters an actual active OpenTelemetry span before query(). The SDK automatically injects its W3C context into the CLI.",
+      "firstLine": 22,
+      "lastLine": 28,
+      "anchors": [
+        "return trace"
+      ],
+      "sourceSHA256": "5c5d19b57c3d0b6985362745c4187604769247990a84a0bfbd1b2ccf43b1df49",
+      "narration": "Step 6. Linked mode enters an actual active OpenTelemetry span before query(). The SDK automatically injects its W3C context into the CLI. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 7,
+      "title": "Run query and consume native messages",
+      "source": "src/agent.ts",
+      "code": "for await (const message of query({ prompt: PROMPTS[c.mode], options })) {\n        if (message.type === \"system\" && message.subtype === \"init\")\n          observe(\"sdk-init\", {\n            sessionId: message.session_id,\n            model: message.model,",
+      "language": "typescript",
+      "explanation": "The regular SDK response stream stays separate from OTLP exports. Only the disposable Read task is available.",
+      "firstLine": 122,
+      "lastLine": 126,
+      "anchors": [
+        "for await (const message of query({ prompt: PROMPTS[c.mode], options })) {"
+      ],
+      "sourceSHA256": "5f18411b89c4ae36aabc1b650cc8466a9957c0163a6aeb837b795e3d44ba6d52",
+      "narration": "Step 7. The regular SDK response stream stays separate from OTLP exports. Only the disposable Read task is available. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 8,
+      "title": "Receive and decode native OTLP",
+      "source": "src/collector.ts",
+      "code": "const payload = sanitize(JSON.parse(body.toString(\"utf8\")));\n      const signal = match[1] as \"traces\" | \"metrics\" | \"logs\";\n      data[signal].push(...flatten(signal, payload));\n      data.requests.push({\n        path: req.url,",
+      "language": "typescript",
+      "explanation": "Parse actual JSON batches received over HTTP, sanitize account identity, then flatten each signal without inventing spans or metrics.",
+      "firstLine": 132,
+      "lastLine": 136,
+      "anchors": [
+        "const payload = sanitize(JSON.parse(body.toString(\"utf8\")));"
+      ],
+      "sourceSHA256": "64625814a72f521e6a5468e484134cc6714eaf61a1150aeefb365daef5b25fec",
+      "narration": "Step 8. Parse actual JSON batches received over HTTP, sanitize account identity, then flatten each signal without inventing spans or metrics. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 9,
+      "title": "Retain span IDs and resource tags",
+      "source": "src/collector.ts",
+      "code": "if (signal === \"traces\")\n        for (const span of scope.spans || [])\n          rows.push({\n            ...span,\n            resource: tags,\n            attributes: attributes(span.attributes),\n            events: (span.events || []).map((e: any) => ({\n              ...e,\n              attributes: attributes(e.attributes),\n            })),",
+      "language": "typescript",
+      "explanation": "Preserve native parent links and resource attributes. The browser derives its tree from those IDs. Hook spans require separate detailed beta tracing, which this app does not enable.",
+      "firstLine": 51,
+      "lastLine": 60,
+      "anchors": [
+        "if (signal === \"traces\")"
+      ],
+      "sourceSHA256": "64625814a72f521e6a5468e484134cc6714eaf61a1150aeefb365daef5b25fec",
+      "narration": "Step 9. Preserve native parent links and resource attributes. The browser derives its tree from those IDs. Hook spans require separate detailed beta tracing, which this app does not enable. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 10,
+      "title": "Export the finished host span",
+      "source": "src/tracing.ts",
+      "code": "const exporter = new OTLPTraceExporter({\n          url: endpoint + \"/v1/traces\",\n          headers: { Authorization: `Bearer ${token}` },\n        });",
+      "language": "typescript",
+      "explanation": "Export the real host span through the official OpenTelemetry exporter to the same receiver. Verify matching trace and parent IDs in Linked mode.",
+      "firstLine": 31,
+      "lastLine": 34,
+      "anchors": [
+        "const exporter = new OTLPTraceExporter({"
+      ],
+      "sourceSHA256": "5c5d19b57c3d0b6985362745c4187604769247990a84a0bfbd1b2ccf43b1df49",
+      "narration": "Step 10. Export the real host span through the official OpenTelemetry exporter to the same receiver. Verify matching trace and parent IDs in Linked mode. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 11,
+      "title": "Attach encoded classroom attributes",
+      "source": "src/settings.ts",
+      "code": "const user = mode === \"tags\" ? \"student 47\" : \"classroom-demo\";\n  return `service.version=1.0.0,deployment.environment=classroom,enduser.id=${encodeURIComponent(user)},tenant.id=demo-school`;\n}",
+      "language": "typescript",
+      "explanation": "Use a fictional classroom identity and percent-encode its space in OTEL_RESOURCE_ATTRIBUTES. The decoded enduser.id can filter tool-result events.",
+      "firstLine": 39,
+      "lastLine": 41,
+      "anchors": [
+        "const user = mode === \"tags\" ? \"student 47\" : \"classroom-demo\";"
+      ],
+      "sourceSHA256": "4cefab08929329215e6ffa00ae94a1995f923a93468f2f3785f90268d224db92",
+      "narration": "Step 11. Use a fictional classroom identity and percent-encode its space in OTEL_RESOURCE_ATTRIBUTES. The decoded enduser.id can filter tool-result events. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 12,
+      "title": "Make content logging explicit",
+      "source": "src/settings.ts",
+      "code": "OTEL_LOG_USER_PROMPTS: mode === \"content\" ? \"1\" : \"0\",\n    OTEL_LOG_TOOL_DETAILS: mode === \"content\" ? \"1\" : \"0\",\n    OTEL_LOG_TOOL_CONTENT: mode === \"content\" ? \"1\" : \"0\",\n    OTEL_LOG_RAW_API_BODIES: \"0\",\n    CLAUDE_CODE_OTEL_DIAG_STDERR: \"1\",",
+      "language": "typescript",
+      "explanation": "Content mode opts in to synthetic prompt, tool details and tool output. Raw API bodies remain disabled. Default structural telemetry can still contain identifiers; the receiver sanitizes account attributes.",
+      "firstLine": 30,
+      "lastLine": 34,
+      "anchors": [
+        "OTEL_LOG_USER_PROMPTS: mode === \"content\" ? \"1\" : \"0\","
+      ],
+      "sourceSHA256": "4cefab08929329215e6ffa00ae94a1995f923a93468f2f3785f90268d224db92",
+      "narration": "Step 12. Content mode opts in to synthetic prompt, tool details and tool output. Raw API bodies remain disabled. Default structural telemetry can still contain identifiers; the receiver sanitizes account attributes. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 13,
+      "title": "Compare delivery with agent completion",
+      "source": "src/agent.ts",
+      "code": "const data = receiver.snapshot();\n    const after = await workspace.snapshot();\n    const evidence = {\n      mode: c.mode,\n      results,\n      telemetry: data,",
+      "language": "typescript",
+      "explanation": "Keep receiver requests, diagnostics and SDK results as independent evidence. A successful agent response does not prove telemetry was accepted; the rejected-endpoint mode demonstrates this.",
+      "firstLine": 154,
+      "lastLine": 159,
+      "anchors": [
+        "const data = receiver.snapshot();"
+      ],
+      "sourceSHA256": "5f18411b89c4ae36aabc1b650cc8466a9957c0163a6aeb837b795e3d44ba6d52",
+      "narration": "Step 13. Keep receiver requests, diagnostics and SDK results as independent evidence. A successful agent response does not prove telemetry was accepted; the rejected-endpoint mode demonstrates this. This source excerpt shows the corresponding application statement."
+    }
+  ]
+}

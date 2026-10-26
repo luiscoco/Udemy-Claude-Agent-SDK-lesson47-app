@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent SDK LESSON 47 · Architecture and &lt;em&gt;UML workflow.&lt;/em&gt;</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/code-highlighting.css"></head><body><main><div class="brand"><a href="/">How <span>Claude Agent SDK</span> Works</a><span class="badge">LESSON 47 / OPENTELEMETRY</span></div><header class="hero"><div><div class="eyebrow">CONFIGURE · EXPORT · INSPECT</div><h1>Architecture and <em>UML workflow.</em></h1><p class="lead">Every workflow step includes its corresponding coloured code excerpt.</p></div><img src="/astronaut.png" alt="Course astronaut mascot"></header><nav class="nav" aria-label="Application sections"><a href="/">Application lab</a><a href="/learn.html">What you will learn</a><a href="/run.html">How to run</a><a href="/architecture.html" aria-current="page">Architecture & workflow</a><a href="/walkthrough.html">Code walkthrough</a><button id="theme" type="button">Dark mode</button></nav><p class="note">The host starts a per-run OTLP receiver. CLI response messages return through the SDK; telemetry travels separately over HTTP. Receiver and viewer are classroom components, not a production collector backend. Some numbered steps describe alternative experiments.</p><a class="button" href="/architecture.svg" download>Download UML SVG</a><div class="diagram"><img src="/architecture.svg" alt="Thirteen source-linked observability workflow steps"></div><section class="step workflow-step" id="workflow-step-01"><span class="number">01</span><h3>1. Validate the selected experiment</h3><p>Accept a fixed experiment only. Browser input cannot choose an arbitrary telemetry destination or add tools.</p><p class="source">Source: src/protocol.ts · lines 16–22 · selected source; surrounding code omitted</p><pre><code class="language-typescript">if (
+    !input ||
+    Object.keys(input).some((k) =&gt; k !== &quot;mode&quot;) ||
+    !MODES.includes(input.mode)
+  )
+    throw new Error(&quot;Choose a listed telemetry experiment.&quot;);
+  return { mode: input.mode };</code></pre></section><section class="step workflow-step" id="workflow-step-02"><span class="number">02</span><h3>2. Start the local OTLP receiver</h3><p>Bind a private loopback port chosen by the OS. The classroom receiver keeps bounded per-run data in memory; it is not a production Collector distribution.</p><p class="source">Source: src/collector.ts · lines 147–151 · selected source; surrounding code omitted</p><pre><code class="language-typescript">server.listen(0, &quot;127.0.0.1&quot;);
+  await once(server, &quot;listening&quot;);
+  const address = server.address();
+  if (!address || typeof address === &quot;string&quot;)
+    throw new Error(&quot;Collector could not start.&quot;);</code></pre></section><section class="step workflow-step" id="workflow-step-03"><span class="number">03</span><h3>3. Enable the selected signals</h3><p>Select OTLP exporters for each signal and enable beta tracing where needed. Off explicitly disables telemetry.</p><p class="source">Source: src/settings.ts · lines 17–21 · selected source; surrounding code omitted</p><pre><code class="language-typescript">CLAUDE_CODE_ENABLE_TELEMETRY: enabled ? &quot;1&quot; : &quot;0&quot;,
+    CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: selected(&quot;traces&quot;) ? &quot;1&quot; : &quot;0&quot;,
+    OTEL_TRACES_EXPORTER: selected(&quot;traces&quot;) ? &quot;otlp&quot; : &quot;none&quot;,
+    OTEL_METRICS_EXPORTER: selected(&quot;metrics&quot;) ? &quot;otlp&quot; : &quot;none&quot;,
+    OTEL_LOGS_EXPORTER: selected(&quot;logs&quot;) ? &quot;otlp&quot; : &quot;none&quot;,</code></pre></section><section class="step workflow-step" id="workflow-step-04"><span class="number">04</span><h3>4. Configure OTLP and short intervals</h3><p>Use standard OTLP HTTP/JSON for inspectable native exports. The lesson slide uses HTTP/protobuf, another supported encoding. One-second intervals reduce short-run batching windows.</p><p class="source">Source: src/settings.ts · lines 22–27 · selected source; surrounding code omitted</p><pre><code class="language-typescript">OTEL_EXPORTER_OTLP_PROTOCOL: &quot;http/json&quot;,
+    OTEL_EXPORTER_OTLP_ENDPOINT: endpoint,
+    OTEL_EXPORTER_OTLP_HEADERS: `Authorization=Bearer ${token}`,
+    OTEL_METRIC_EXPORT_INTERVAL: &quot;1000&quot;,
+    OTEL_LOGS_EXPORT_INTERVAL: &quot;1000&quot;,
+    OTEL_TRACES_EXPORT_INTERVAL: &quot;1000&quot;,</code></pre></section><section class="step workflow-step" id="workflow-step-05"><span class="number">05</span><h3>5. Preserve the private process environment</h3><p>Preserve PATH and private credentials while replacing inherited exporter routing with this per-run local configuration. Isolate SDK state in the disposable workspace.</p><p class="source">Source: src/agent.ts · lines 64–67 · selected source; surrounding code omitted</p><pre><code class="language-typescript">env: {
+        ...inheritedEnvironment(),
+        ...otel,
+        HOME: workspace.home,</code></pre></section><section class="step workflow-step" id="workflow-step-06"><span class="number">06</span><h3>6. Create an active application span</h3><p>Linked mode enters an actual active OpenTelemetry span before query(). The SDK automatically injects its W3C context into the CLI.</p><p class="source">Source: src/tracing.ts · lines 22–28 · selected source; surrounding code omitted</p><pre><code class="language-typescript">return trace
+    .getTracer(&quot;lesson47&quot;)
+    .startActiveSpan(&quot;classroom.http.request&quot;, async (span) =&gt; {
+      const ids = span.spanContext();
+      try {
+        await action();
+      } finally {</code></pre></section><section class="step workflow-step" id="workflow-step-07"><span class="number">07</span><h3>7. Run query and consume native messages</h3><p>The regular SDK response stream stays separate from OTLP exports. Only the disposable Read task is available.</p><p class="source">Source: src/agent.ts · lines 122–126 · selected source; surrounding code omitted</p><pre><code class="language-typescript">for await (const message of query({ prompt: PROMPTS[c.mode], options })) {
+        if (message.type === &quot;system&quot; &amp;&amp; message.subtype === &quot;init&quot;)
+          observe(&quot;sdk-init&quot;, {
+            sessionId: message.session_id,
+            model: message.model,</code></pre></section><section class="step workflow-step" id="workflow-step-08"><span class="number">08</span><h3>8. Receive and decode native OTLP</h3><p>Parse actual JSON batches received over HTTP, sanitize account identity, then flatten each signal without inventing spans or metrics.</p><p class="source">Source: src/collector.ts · lines 132–136 · selected source; surrounding code omitted</p><pre><code class="language-typescript">const payload = sanitize(JSON.parse(body.toString(&quot;utf8&quot;)));
+      const signal = match[1] as &quot;traces&quot; | &quot;metrics&quot; | &quot;logs&quot;;
+      data[signal].push(...flatten(signal, payload));
+      data.requests.push({
+        path: req.url,</code></pre></section><section class="step workflow-step" id="workflow-step-09"><span class="number">09</span><h3>9. Retain span IDs and resource tags</h3><p>Preserve native parent links and resource attributes. The browser derives its tree from those IDs. Hook spans require separate detailed beta tracing, which this app does not enable.</p><p class="source">Source: src/collector.ts · lines 51–60 · selected source; surrounding code omitted</p><pre><code class="language-typescript">if (signal === &quot;traces&quot;)
+        for (const span of scope.spans || [])
+          rows.push({
+            ...span,
+            resource: tags,
+            attributes: attributes(span.attributes),
+            events: (span.events || []).map((e: any) =&gt; ({
+              ...e,
+              attributes: attributes(e.attributes),
+            })),</code></pre></section><section class="step workflow-step" id="workflow-step-10"><span class="number">10</span><h3>10. Export the finished host span</h3><p>Export the real host span through the official OpenTelemetry exporter to the same receiver. Verify matching trace and parent IDs in Linked mode.</p><p class="source">Source: src/tracing.ts · lines 31–34 · selected source; surrounding code omitted</p><pre><code class="language-typescript">const exporter = new OTLPTraceExporter({
+          url: endpoint + &quot;/v1/traces&quot;,
+          headers: { Authorization: `Bearer ${token}` },
+        });</code></pre></section><section class="step workflow-step" id="workflow-step-11"><span class="number">11</span><h3>11. Attach encoded classroom attributes</h3><p>Use a fictional classroom identity and percent-encode its space in OTEL_RESOURCE_ATTRIBUTES. The decoded enduser.id can filter tool-result events.</p><p class="source">Source: src/settings.ts · lines 39–41 · selected source; surrounding code omitted</p><pre><code class="language-typescript">const user = mode === &quot;tags&quot; ? &quot;student 47&quot; : &quot;classroom-demo&quot;;
+  return `service.version=1.0.0,deployment.environment=classroom,enduser.id=${encodeURIComponent(user)},tenant.id=demo-school`;
+}</code></pre></section><section class="step workflow-step" id="workflow-step-12"><span class="number">12</span><h3>12. Make content logging explicit</h3><p>Content mode opts in to synthetic prompt, tool details and tool output. Raw API bodies remain disabled. Default structural telemetry can still contain identifiers; the receiver sanitizes account attributes.</p><p class="source">Source: src/settings.ts · lines 30–34 · selected source; surrounding code omitted</p><pre><code class="language-typescript">OTEL_LOG_USER_PROMPTS: mode === &quot;content&quot; ? &quot;1&quot; : &quot;0&quot;,
+    OTEL_LOG_TOOL_DETAILS: mode === &quot;content&quot; ? &quot;1&quot; : &quot;0&quot;,
+    OTEL_LOG_TOOL_CONTENT: mode === &quot;content&quot; ? &quot;1&quot; : &quot;0&quot;,
+    OTEL_LOG_RAW_API_BODIES: &quot;0&quot;,
+    CLAUDE_CODE_OTEL_DIAG_STDERR: &quot;1&quot;,</code></pre></section><section class="step workflow-step" id="workflow-step-13"><span class="number">13</span><h3>13. Compare delivery with agent completion</h3><p>Keep receiver requests, diagnostics and SDK results as independent evidence. A successful agent response does not prove telemetry was accepted; the rejected-endpoint mode demonstrates this.</p><p class="source">Source: src/agent.ts · lines 154–159 · selected source; surrounding code omitted</p><pre><code class="language-typescript">const data = receiver.snapshot();
+    const after = await workspace.snapshot();
+    const evidence = {
+      mode: c.mode,
+      results,
+      telemetry: data,</code></pre></section><footer>CLAUDE AGENT SDK · LESSON 47 · TRACES · METRICS · EVENTS<br>TypeScript · local runtime · API key stays on the server</footer></main><script src="/navigation.js"></script><script src="/prism.js"></script><script src="/prism-markup.min.js"></script><script src="/prism-yaml.min.js"></script><script src="/prism-markdown.min.js"></script><script src="/prism-python.min.js"></script><script src="/code-highlighting.js"></script><script src="/marked.umd.js"></script><script src="/purify.min.js"></script></body></html>
